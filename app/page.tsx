@@ -216,7 +216,7 @@ export default function Home() {
 
             {/* Sync trigger button */}
             <button
-              onClick={simpanJalwal}
+              onClick={simpanJadwal}
               className="mt-2 w-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 text-neutral-950 font-bold py-3.5 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
