@@ -1,65 +1,64 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [jam, setJam] = useState<number>(7);
+  const [menit, setMenit] = useState<number>(0);
+  const [status, setStatus] = useState<string>("Memuat data...");
+
+  // Ambil data jadwal saat pertama kali web dibuka
+  useEffect(() => {
+    fetch("/api/jadwal")
+      .then((res) => res.json())
+      .then((data) => {
+        setJam(data.jam);
+        setMenit(data.menit);
+        setStatus(`Jadwal saat ini: ${String(data.jam).padStart(2, '0')}:${String(data.menit).padStart(2, '0')} WIB`);
+      })
+      .catch(() => setStatus("Gagal memuat jadwal"));
+  }, []);
+
+  // Fungsi saat tombol "Simpan" diklik
+  const simpanJadwal = async () => {
+    setStatus("Menyimpan...");
+    try {
+      const res = await fetch("/api/jadwal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jam: jam, menit: menit }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(`Sukses! Jadwal diubah ke ${String(jam).padStart(2, '0')}:${String(menit).padStart(2, '0')} WIB`);
+      } else {
+        setStatus("Gagal menyimpan.");
+      }
+    } catch (error) {
+      setStatus("Terjadi kesalahan jaringan.");
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main style={{ fontFamily: "Arial, sans-serif", textAlign: "center", background: "#f0f2f5", minHeight: "100vh", padding: "40px 20px" }}>
+      <div style={{ background: "white", padding: "30px", borderRadius: "12px", maxWidth: "400px", margin: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+        <h2 style={{ color: "#333", marginBottom: "5px" }}>⏰ Alarm Obat Next.js</h2>
+        <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>Kontrol jadwal dari mana saja melalui Cloud</p>
+
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ marginRight: "15px", fontSize: "16px" }}>
+            Jam: <input type="number" min="0" max="23" value={jam} onChange={(e) => setJam(Number(e.target.value))} style={{ width: "60px", padding: "8px", fontSize: "16px", textAlign: "center", borderRadius: "6px", border: "1px solid #ccc" }} />
+          </label>
+          <label style={{ fontSize: "16px" }}>
+            Menit: <input type="number" min="0" max="59" value={menit} onChange={(e) => setMenit(Number(e.target.value))} style={{ width: "60px", padding: "8px", fontSize: "16px", textAlign: "center", borderRadius: "6px", border: "1px solid #ccc" }} />
+          </label>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        <button onClick={simpanJadwal} style={{ background: "#0070f3", color: "white", border: "none", padding: "10px 20px", fontSize: "16px", borderRadius: "6px", cursor: "pointer", width: "100%" }}>
+          Simpan Jadwal Baru
+        </button>
+
+        <p style={{ marginTop: "20px", fontSize: "14px", color: "#555", fontStyle: "italic" }}>{status}</p>
+      </div>
+    </main>
   );
 }
