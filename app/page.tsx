@@ -5,22 +5,56 @@ export default function Home() {
   const [jam, setJam] = useState<number>(7);
   const [menit, setMenit] = useState<number>(0);
   const [namaObat, setNamaObat] = useState<string>("");
-  const [status, setStatus] = useState<string>("Memuat data dari Supabase...");
+  const [status, setStatus] = useState<string>("Menghubungkan ke server...");
+  const [statusType, setStatusType] = useState<"info" | "success" | "error">("info");
+  const [lastUpdated, setLastUpdated] = useState<string>("-");
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  // Clock tick
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toTimeString().split(' ')[0] + " WIB");
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetch("/api/jadwal")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Gagal mengambil data");
+        return res.json();
+      })
       .then((data) => {
         setJam(data.jam);
         setMenit(data.menit);
-        setNamaObat(data.nama_obat);
-        setStatus(`Aktif: ${String(data.jam).padStart(2, '0')}:${String(data.menit).padStart(2, '0')} WIB (${data.nama_obat})`);
+        setNamaObat(data.nama_obat || "");
+        setStatus("Tersambung ke Supabase Cloud");
+        setStatusType("success");
+        setLastUpdated(new Date().toLocaleTimeString("id-ID") + " WIB");
       })
-      .catch(() => setStatus("Gagal memuat jadwal"));
+      .catch((err) => {
+        setStatus("Gagal sinkronisasi dengan database cloud");
+        setStatusType("error");
+      });
   }, []);
 
   const simpanJadwal = async () => {
-    setStatus("Menyimpan ke Supabase...");
+    if (jam < 0 || jam > 23 || menit < 0 || menit > 59) {
+      setStatus("Waktu tidak valid! (Jam: 0-23, Menit: 0-59)");
+      setStatusType("error");
+      return;
+    }
+    if (!namaObat.trim()) {
+      setStatus("Nama obat tidak boleh kosong!");
+      setStatusType("error");
+      return;
+    }
+
+    setStatus("Menyimpan perubahan...");
+    setStatusType("info");
     try {
       const res = await fetch("/api/jadwal", {
         method: "POST",
@@ -29,41 +63,192 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.success) {
-        setStatus(`Sukses diperbarui! Jam ${String(jam).padStart(2, '0')}:${String(menit).padStart(2, '0')} WIB - Obat: ${namaObat}`);
+        setStatus("Berhasil diperbarui & disinkronkan ke NodeMCU");
+        setStatusType("success");
+        setLastUpdated(new Date().toLocaleTimeString("id-ID") + " WIB");
       } else {
-        setStatus("Gagal menyimpan.");
+        setStatus("Gagal menyimpan data ke database");
+        setStatusType("error");
       }
     } catch (error) {
-      setStatus("Terjadi kesalahan jaringan.");
+      setStatus("Kesalahan jaringan. Periksa koneksi Anda.");
+      setStatusType("error");
     }
   };
 
   return (
-    <main style={{ fontFamily: "Arial, sans-serif", textAlign: "center", background: "#f0f2f5", minHeight: "100vh", padding: "40px 20px" }}>
-      <div style={{ background: "white", padding: "30px", borderRadius: "12px", maxWidth: "450px", margin: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
-        <h2 style={{ color: "#333", marginBottom: "5px" }}>⏰ Smart Pills × Supabase</h2>
-        <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>Data tersimpan aman dan permanen di Database Cloud</p>
-
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ marginRight: "15px", fontSize: "16px" }}>
-            Jam: <input type="number" min="0" max="23" value={jam} onChange={(e) => setJam(Number(e.target.value))} style={{ width: "60px", padding: "8px", fontSize: "16px", textAlign: "center", borderRadius: "6px", border: "1px solid #ccc" }} />
-          </label>
-          <label style={{ fontSize: "16px" }}>
-            Menit: <input type="number" min="0" max="59" value={menit} onChange={(e) => setMenit(Number(e.target.value))} style={{ width: "60px", padding: "8px", fontSize: "16px", textAlign: "center", borderRadius: "6px", border: "1px solid #ccc" }} />
-          </label>
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans">
+      {/* Top Navbar */}
+      <header className="border-b border-neutral-900 bg-neutral-950/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-neutral-950" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-white">Smart Pill Dispenser</h1>
+              <p className="text-[10px] text-teal-400 font-mono tracking-widest uppercase">IoT Controller</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-neutral-400">Waktu Lokal</p>
+              <p className="text-sm font-mono font-bold text-teal-400">{currentTime || "Loading..."}</p>
+            </div>
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium ${
+              statusType === "success" ? "border-teal-500/20 bg-teal-500/5 text-teal-400" :
+              statusType === "error" ? "border-red-500/20 bg-red-500/5 text-red-400" :
+              "border-yellow-500/20 bg-yellow-500/5 text-yellow-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                statusType === "success" ? "bg-teal-400" :
+                statusType === "error" ? "bg-red-400" :
+                "bg-yellow-400 animate-pulse"
+              }`} />
+              {statusType === "success" ? "Supabase Online" : statusType === "error" ? "Offline" : "Menghubungkan"}
+            </div>
+          </div>
         </div>
+      </header>
 
-        <div style={{ marginBottom: "20px", textAlign: "left" }}>
-          <label style={{ fontSize: "14px", fontWeight: "bold", color: "#444", display: "block", marginBottom: "5px" }}>Daftar / Nama Obat:</label>
-          <input type="text" value={namaObat} onChange={(e) => setNamaObat(e.target.value)} placeholder="Contoh: Paracetamol, Amoxicillin" style={{ width: "100%", padding: "10px", boxSizing: "border-box", fontSize: "15px", borderRadius: "6px", border: "1px solid #ccc" }} />
-        </div>
+      {/* Main Content */}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-12 gap-8">
+        
+        {/* Left Column - Current Status and Info */}
+        <section className="md:col-span-5 flex flex-col gap-6">
+          
+          {/* Active Schedule Card */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-400">Jadwal Aktif Saat Ini</h2>
+              <span className="text-[10px] font-mono text-neutral-500">NodeMCU Ref: 1</span>
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <p className="text-5xl font-mono font-bold tracking-tight text-white">
+                {String(jam).padStart(2, '0')}:{String(menit).padStart(2, '0')}
+                <span className="text-lg font-sans font-medium text-neutral-400 ml-2">WIB</span>
+              </p>
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase tracking-wider font-semibold">Daftar Obat</p>
+                <p className="text-lg font-bold text-teal-400 truncate">{namaObat || "Belum Ada Obat"}</p>
+              </div>
+            </div>
 
-        <button onClick={simpanJadwal} style={{ background: "#0070f3", color: "white", border: "none", padding: "12px 20px", fontSize: "16px", borderRadius: "6px", cursor: "pointer", width: "100%", fontWeight: "bold" }}>
-          Perbarui Database
-        </button>
+            <div className="mt-4 pt-3 border-t border-neutral-800/60 flex items-center justify-between text-xs text-neutral-400">
+              <span>Sinkronisasi Terakhir:</span>
+              <span className="font-mono text-neutral-200">{lastUpdated}</span>
+            </div>
+          </div>
 
-        <p style={{ marginTop: "20px", fontSize: "14px", color: "#0070f3", fontStyle: "italic", fontWeight: "5px" }}>{status}</p>
-      </div>
-    </main>
+          {/* Connection Details Information Card */}
+          <div className="bg-neutral-900/50 border border-neutral-800/80 rounded-xl p-6 flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-white">Panduan Integrasi IoT</h3>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              NodeMCU di kotak obat Anda disinkronkan secara nirkabel dengan halaman web ini. Setiap perubahan jadwal di bawah akan segera dimuat oleh modul IoT dalam interval 10 detik.
+            </p>
+            <div className="bg-neutral-950 p-3 rounded-lg border border-neutral-800 font-mono text-[10px] text-neutral-300">
+              <p className="text-teal-400">// API Endpoint</p>
+              <p className="truncate">GET /api/jadwal</p>
+            </div>
+          </div>
+
+        </section>
+
+        {/* Right Column - Schedule Control Panel Form */}
+        <section className="md:col-span-7 bg-neutral-900 border border-neutral-800 rounded-xl p-6 sm:p-8 flex flex-col gap-6">
+          <div className="border-b border-neutral-800 pb-4">
+            <h2 className="text-lg font-bold text-white">Atur Jadwal Baru</h2>
+            <p className="text-xs text-neutral-400">Keluarga dapat memperbarui konfigurasi waktu dan jenis obat yang dikeluarkan secara langsung.</p>
+          </div>
+
+          <div className="flex flex-col gap-5">
+            {/* Hour & Minute Inputs */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-neutral-300" htmlFor="hour-input">Jam</label>
+                <div className="relative">
+                  <input
+                    id="hour-input"
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={jam}
+                    onChange={(e) => setJam(Math.max(0, Math.min(23, Number(e.target.value))))}
+                    className="w-full bg-neutral-950 border border-neutral-800 hover:border-neutral-700 focus:border-teal-500 focus:outline-none rounded-lg px-4 py-3 text-lg font-mono text-center text-white transition-colors"
+                  />
+                  <span className="absolute right-3 top-3.5 text-[10px] font-bold text-neutral-600 font-mono">HR</span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-neutral-300" htmlFor="minute-input">Menit</label>
+                <div className="relative">
+                  <input
+                    id="minute-input"
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={menit}
+                    onChange={(e) => setMenit(Math.max(0, Math.min(59, Number(e.target.value))))}
+                    className="w-full bg-neutral-950 border border-neutral-800 hover:border-neutral-700 focus:border-teal-500 focus:outline-none rounded-lg px-4 py-3 text-lg font-mono text-center text-white transition-colors"
+                  />
+                  <span className="absolute right-3 top-3.5 text-[10px] font-bold text-neutral-600 font-mono">MIN</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Medicine name input */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-neutral-300" htmlFor="medication-input">Daftar / Nama Obat</label>
+              <input
+                id="medication-input"
+                type="text"
+                value={namaObat}
+                onChange={(e) => setNamaObat(e.target.value)}
+                placeholder="Contoh: Vitamin C, Paracetamol, Obat Darah Tinggi"
+                className="w-full bg-neutral-950 border border-neutral-800 hover:border-neutral-700 focus:border-teal-500 focus:outline-none rounded-lg px-4 py-3 text-sm text-white transition-colors placeholder:text-neutral-600"
+              />
+            </div>
+
+            {/* Sync trigger button */}
+            <button
+              onClick={simpanJalwal}
+              className="mt-2 w-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 text-neutral-950 font-bold py-3.5 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Perbarui Jadwal & Sinkronkan
+            </button>
+
+            {/* Status Feedback banner */}
+            <div className={`mt-2 p-3.5 rounded-lg border text-xs leading-relaxed flex items-start gap-2.5 transition-all duration-300 ${
+              statusType === "success" ? "border-teal-500/20 bg-teal-500/5 text-teal-400" :
+              statusType === "error" ? "border-red-500/20 bg-red-500/5 text-red-400" :
+              "border-neutral-800 bg-neutral-950 text-neutral-400"
+            }`}>
+              <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-semibold">Informasi Status:</p>
+                <p className="text-[11px] mt-0.5 opacity-90">{status}</p>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-neutral-900 bg-neutral-950 text-center py-6 text-xs text-neutral-600">
+        <p>Smart Pill Dispenser System © 2026 • Terhubung dengan Database Supabase Cloud</p>
+      </footer>
+    </div>
   );
 }
