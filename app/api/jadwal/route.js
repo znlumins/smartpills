@@ -36,18 +36,26 @@ export async function GET(request) {
 
         const { data, error } = await supabase
             .from("jadwal_obat")
-            .select("jam, menit, nama_obat")
+            .select("jam, menit, nama_obat, test_buzzer")
             .eq("id", 1)
             .maybeSingle(); // Menggunakan maybeSingle agar tidak crash jika data kosong
 
         // Jika data di tabel kosong, pakai data default
         if (!data) {
-            return NextResponse.json({ jam: 7, menit: 0, nama_obat: "Belum Ada Obat" }, { status: 200 });
+            return NextResponse.json({ jam: 7, menit: 0, nama_obat: "Belum Ada Obat", test_buzzer: false }, { status: 200 });
         }
 
         if (error) throw error;
 
-        return NextResponse.json(data, {
+        // Pastikan properti test_buzzer selalu ada
+        const cleanData = {
+            jam: data.jam,
+            menit: data.menit,
+            nama_obat: data.nama_obat,
+            test_buzzer: data.test_buzzer ?? false
+        };
+
+        return NextResponse.json(cleanData, {
             status: 200,
             headers: {
                 "Cache-Control": "no-store, no-cache, must-revalidate",
@@ -57,7 +65,8 @@ export async function GET(request) {
     } catch (error) {
         console.error("Supabase GET Error:", error ? (error.message || error) : "Unknown error");
         // Jika database bermasalah, kembalikan status 200 dengan data cadangan agar NodeMCU aman
-        return NextResponse.json(dataCadangan, { status: 200 });
+        const offlineData = { ...dataCadangan, test_buzzer: false };
+        return NextResponse.json(offlineData, { status: 200 });
     }
 }
 
@@ -65,6 +74,22 @@ export async function GET(request) {
 export async function POST(request) {
     try {
         const body = await request.json();
+
+        // 1. Tangani Pemicu Test Buzzer Fisik
+        if (body.trigger_test !== undefined) {
+            if (!supabase) {
+                return NextResponse.json({ success: true, message: "Tersimpan lokal (Supabase offline)", data: { test_buzzer: body.trigger_test } });
+            }
+            const { data, error } = await supabase
+                .from("jadwal_obat")
+                .update({ test_buzzer: body.trigger_test })
+                .eq("id", 1)
+                .select();
+            if (error) throw error;
+            return NextResponse.json({ success: true, data });
+        }
+
+        // 2. Tangani Update Jadwal Normal
         const { jam, menit, nama_obat } = body;
 
         if (typeof jam !== "number" || typeof menit !== "number" || typeof nama_obat !== "string") {
