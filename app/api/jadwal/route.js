@@ -113,6 +113,13 @@ export async function POST(request) {
         return NextResponse.json({ success: true, data });
     } catch (error) {
         console.error("Supabase POST Error:", error ? (error.message || error) : "Unknown error");
-        return NextResponse.json({ success: false, message: error ? (error.message || String(error)) : "Unknown error" }, { status: 500 });
+        let errMsg = error ? (error.message || String(error)) : "Unknown error";
+        
+        // Memberikan petunjuk ramah jika kolom test_buzzer belum dibuat di Supabase
+        if (errMsg.includes("column") && errMsg.includes("test_buzzer")) {
+            errMsg = "Kolom 'test_buzzer' belum dibuat di database Supabase Anda. Silakan jalankan SQL: 'alter table public.jadwal_obat add column test_buzzer boolean default false;' di dasbor Supabase.";
+        }
+        
+        return NextResponse.json({ success: false, message: errMsg }, { status: 500 });
     }
 }
