@@ -4,17 +4,26 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Mengambil variabel lingkungan
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Mengambil variabel lingkungan dan membersihkannya dari tanda kutip
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL 
+  ? process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/['"]/g, "").trim() 
+  : "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY 
+  ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.replace(/['"]/g, "").trim() 
+  : "";
 
 // Data cadangan (Fallback) jika Supabase belum terkonfigurasi dengan benar
 let dataCadangan = { jam: 7, menit: 0, nama_obat: "Obat Cadangan (Supabase Offline)" };
 
-// Inisialisasi Supabase secara aman agar tidak memicu error 500 jika variabel kosong
+// Inisialisasi Supabase secara aman agar tidak memicu error 500 jika variabel kosong atau format salah
 let supabase = null;
-if (supabaseUrl && supabaseAnonKey) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith("http")) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseAnonKey);
+    } catch (e) {
+        console.error("Gagal menginisialisasi Supabase client:", e.message || e);
+        supabase = null;
+    }
 }
 
 // GET: Membaca jadwal dari Supabase
@@ -46,7 +55,7 @@ export async function GET(request) {
             },
         });
     } catch (error) {
-        console.error("Supabase GET Error:", error.message);
+        console.error("Supabase GET Error:", error ? (error.message || error) : "Unknown error");
         // Jika database bermasalah, kembalikan status 200 dengan data cadangan agar NodeMCU aman
         return NextResponse.json(dataCadangan, { status: 200 });
     }
@@ -78,7 +87,7 @@ export async function POST(request) {
 
         return NextResponse.json({ success: true, data });
     } catch (error) {
-        console.error("Supabase POST Error:", error.message);
-        return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+        console.error("Supabase POST Error:", error ? (error.message || error) : "Unknown error");
+        return NextResponse.json({ success: false, message: error ? (error.message || String(error)) : "Unknown error" }, { status: 500 });
     }
 }
