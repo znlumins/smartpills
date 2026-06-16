@@ -80,6 +80,11 @@ export default function Home() {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       
+      // Mengaktifkan AudioContext yang di-suspend oleh browser (Kebijakan Autoplay)
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      
       const playTone = (timeOffset: number) => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
