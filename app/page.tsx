@@ -76,6 +76,60 @@ export default function Home() {
     }
   };
 
+  const playWebBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const playTone = (timeOffset: number) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.type = "square";
+        osc.frequency.setValueAtTime(2400, audioCtx.currentTime + timeOffset);
+        
+        gain.gain.setValueAtTime(0, audioCtx.currentTime + timeOffset);
+        gain.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + timeOffset + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + timeOffset + 0.18);
+        
+        osc.start(audioCtx.currentTime + timeOffset);
+        osc.stop(audioCtx.currentTime + timeOffset + 0.22);
+      };
+
+      // Mainkan 2 bip cepat
+      playTone(0);
+      playTone(0.25);
+    } catch (e) {
+      console.warn("Gagal memutar suara di web:", e);
+    }
+  };
+
+  const testKoneksiDanAudio = async () => {
+    setStatus("Menguji koneksi server...");
+    setStatusType("info");
+    
+    // Bunyikan beeper di browser web
+    playWebBeep();
+
+    try {
+      const start = Date.now();
+      const res = await fetch("/api/jadwal");
+      const elapsed = Date.now() - start;
+      
+      if (res.ok) {
+        setStatus(`Koneksi Supabase OK! Latency: ${elapsed}ms. Audio bip berhasil diputar.`);
+        setStatusType("success");
+      } else {
+        setStatus("Server merespons tetapi data gagal dimuat (HTTP " + res.status + ")");
+        setStatusType("error");
+      }
+    } catch (e) {
+      setStatus("Gagal menghubungi server web. Coba periksa koneksi Anda.");
+      setStatusType("error");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans">
       {/* Top Navbar */}
@@ -214,16 +268,28 @@ export default function Home() {
               />
             </div>
 
-            {/* Sync trigger button */}
-            <button
-              onClick={simpanJadwal}
-              className="mt-2 w-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 text-neutral-950 font-bold py-3.5 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              Perbarui Jadwal & Sinkronkan
-            </button>
+            {/* Action buttons grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={simpanJadwal}
+                className="w-full bg-teal-500 hover:bg-teal-400 active:bg-teal-600 text-neutral-950 font-bold py-3.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer text-sm"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Perbarui Jadwal
+              </button>
+
+              <button
+                onClick={testKoneksiDanAudio}
+                className="w-full bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-900 border border-neutral-750 text-white font-bold py-3.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer text-sm"
+              >
+                <svg className="w-5 h-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                </svg>
+                Test Bip Web
+              </button>
+            </div>
 
             {/* Status Feedback banner */}
             <div className={`mt-2 p-3.5 rounded-lg border text-xs leading-relaxed flex items-start gap-2.5 transition-all duration-300 ${
