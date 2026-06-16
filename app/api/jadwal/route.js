@@ -71,8 +71,7 @@ export async function POST(request) {
 
         const { data, error } = await supabase
             .from("jadwal_obat")
-            .update({ jam, menit, nama_obat, updated_at: new Date() })
-            .eq("id", 1)
+            .upsert({ id: 1, jam, menit, nama_obat, updated_at: new Date() })
             .select();
 
         if (error) throw error;
